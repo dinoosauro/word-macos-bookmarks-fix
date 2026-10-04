@@ -3,18 +3,33 @@ Sub ExportDocumentStructure()
 ' Get the document structure (for example, all the headings) and export it to a file, so that it can be merged with the PDF created from macOS.
 '
 '
-
+' par will be the paragraph that is currently being read
+Dim par As Word.Paragraph
+' correctRange will be the subrange of the paragraph that excludes page breaks
+Dim correctRange As Word.Range
+' skipTheseCharacters will number, that is set to 0 at every paragraph iteration, that tells the script when the first valid character (so, not page breaks) actually is
+Dim skipTheseCharacters As Long
 ' str will be our output string
 Dim str As String
-' Add title and author on the top of the file so that we can also add these two metadata.
+
+            
+' Add title and author on the top of the file so that we can add also these two metadata.
 str = Word.ActiveDocument.BuiltInDocumentProperties("Title") & vbNewLine & Word.ActiveDocument.BuiltInDocumentProperties("Author") & vbNewLine
-
-
 For Each par In Word.ActiveDocument.Paragraphs
-    If par.OutlineLevel < 10 Then ' OutlineLevel = 10 is body text
-    ' Separator char: ;
-    ' Syntax: Outline level; Page; Horizontal position; Vertical position; Text
-        str = str & CStr(par.OutlineLevel) & ";" & CStr(par.Range.Information(wdActiveEndPageNumber)) & ";" & CStr(par.Range.Information(wdHorizontalPositionRelativeToPage)) & ";" & CStr(par.Range.Information(wdVerticalPositionRelativeToPage)) & ";" & par.Range.Text & vbNewLine ' It seems that par.Range.Text automatically removes new lines without space, so we don't need to sanitize them with \n
+    If par.OutlineLevel < 10 Then
+        ' We'll now count the number of characters at the start of the paragraph text that are either page breaks, column breaks or line breaks so that we can skip them in the paragraph position calculation
+        skipTheseCharacters = 0
+        Do While skipTheseCharacters < Len(par.Range.text)
+            Select Case Mid$(par.Range.text, skipTheseCharacters + 1, 1)
+                Case Chr(12), Chr(14), Chr(11)
+                    skipTheseCharacters = skipTheseCharacters + 1
+                Case Else
+                    Exit Do
+            End Select
+        Loop
+        Set correctRange = par.Range
+        correctRange.SetRange par.Range.Start + skipTheseCharacters, par.Range.Start + skipTheseCharacters   ' collapsed at first real character
+        str = str & CStr(par.OutlineLevel) & ";" & CStr(correctRange.Information(wdActiveEndPageNumber)) & ";" & CStr(correctRange.Information(wdHorizontalPositionRelativeToPage)) & ";" & CStr(correctRange.Information(wdVerticalPositionRelativeToPage)) & ";" & Replace(Replace(par.Range.text, Chr(12), ""), Chr(14), "") & vbNewLine
     End If
 Next par
 
@@ -36,4 +51,3 @@ Open (savePath) For Output As #fileNum
     Close #fileNum
 
 End Sub
-

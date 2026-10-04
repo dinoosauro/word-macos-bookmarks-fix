@@ -5,7 +5,7 @@ import sys
 
 reader = PdfReader(sys.argv[1])
 writer = PdfWriter()
-writer.append(reader)
+writer.append(reader, import_outline=False)
 
 
 metadata_list = dict(reader.metadata)
